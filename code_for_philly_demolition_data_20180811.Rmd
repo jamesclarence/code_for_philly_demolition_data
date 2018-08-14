@@ -1,0 +1,115 @@
+---
+title: "Philadelphia Demolition Data"
+author: "Jay Fisher"
+date: "August 11, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r load_packages, include=FALSE}
+library(tidyverse)
+library(lubridate)
+```
+
+```{r read_data, include=FALSE}
+# Read in files
+li_demolitions <- read_csv("C:/Users/fishe/Desktop/li_demolitions.csv")
+```
+
+```{r completed_demos, include=FALSE}
+# Completed demos, with completed year and days to complete columns added in
+li_demo_complete <- li_demolitions %>%
+  filter(status == "COMPLETED", is.na(li_demolitions$completed_date) == F) %>% 
+  mutate(year_complete = year(completed_date),
+         days_to_complete = (completed_date - start_date)/((60*60)*24),
+         zip_simple = str_sub(zip, 1, 5)
+           )
+```
+
+## Introduction
+### Data
+- Demolition Data 
+
+### Tools
+- RStudio
+- R Markdown
+- `tidyverse`, `lubridate` R packages
+
+## Total Demolitions per Year
+```{r echo=FALSE}
+li_demo_complete %>% 
+  ggplot(aes(x = year_complete)) +
+  geom_bar() +
+  theme_bw()
+```
+
+<br>
+
+## Average Time to Complete Demolition by Year
+```{r avg_time_complete_demo_by_year, echo=FALSE}
+li_demo_complete %>%
+  group_by(year_complete) %>% 
+  summarise(avg_days_to_complete = mean(days_to_complete)) %>% 
+  ggplot(aes(x = year_complete, y = as.numeric(avg_days_to_complete))) +
+    geom_bar(stat="identity") + 
+  ylab("Avg Days To Complete") +
+  theme_bw()
+```
+
+<br>
+
+## Why is the average time to complete so high in 2013?
+```{r 2013_avg_time, echo=FALSE, message=FALSE, warning=FALSE, paged.print=TRUE}
+li_demo_complete %>% 
+  filter(year_complete != c(2007)) %>% 
+  ggplot(aes(x = year_complete, y = days_to_complete, group = year_complete)) +
+  geom_boxplot() +
+  # geom_hline(yintercept = 365, linetype = 2, color = "grey") +
+  theme_bw() +
+  theme(panel.grid.major.y = element_line(linetype = 2),
+        panel.grid.minor.y = element_blank()) +
+  scale_y_continuous(breaks = seq(0, (365*7), 365))
+```
+<br>
+Guesses: Higher number of multi-year demolition projects finished, larger property sizes
+
+<br>
+
+## Zip Codes With Most Demolitions in 2017
+```{r zips_with_most_demos_in_2017, echo=FALSE, message=FALSE, warning=FALSE}
+# 2017: 19121, 19132, 19143, 19146, 19125
+demo_top_5_2017 <- li_demo_complete %>% 
+  filter(year_complete != 2018, 
+         zip_simple == "19121" | zip_simple == "19132" | zip_simple == "19143" | zip_simple == '19146' | zip_simple == '19125') %>% 
+  group_by(zip_simple, year_complete) %>% 
+  summarise(count = n())
+
+demo_top_5_2017 %>% 
+  ggplot(aes(x = year_complete, y = count, group = zip_simple, color = zip_simple)) +
+    geom_line(size = 2, alpha = 0.75) +
+  theme_bw() +
+  scale_x_continuous(breaks=seq(2007, 2017, 1)) +
+  theme(legend.title=element_blank(),
+        legend.direction = "horizontal", legend.position = "bottom")
+```
+
+The Top 5 zip codes with demolitions in 2017 are 19121, 19132, 19143, 19146, and 19125.
+
+19121 and 19132 are North Philadelphia neighboorhoods. 19146 is South Philly (Point Breeze). 19143 - West Philly. 19125 - Fishtown.
+
+<hr>
+
+## Data Quality Issues
+```{r include=FALSE}
+status_complete_no_completed_date <- li_demolitions %>%
+  filter(status == "COMPLETED", is.na(li_demolitions$completed_date))
+```
+
+- Where status = COMPLETED, but data set does not have completed_date: `r nrow(status_complete_no_completed_date)`
+- Two examples where Completed Date happened before Start Date
+
+
